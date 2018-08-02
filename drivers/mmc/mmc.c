@@ -9,6 +9,7 @@
 #include <arch_helpers.h>
 #include <assert.h>
 #include <debug.h>
+#include <delay_timer.h>
 #include <errno.h>
 #include <mmc.h>
 #include <stdbool.h>
@@ -319,17 +320,11 @@ static int mmc_fill_device_info(void)
 
 static int sd_send_op_cond(void)
 {
-	int retries = SEND_OP_COND_MAX_RETRIES;
+	int n;
 	unsigned int resp_data[4];
 
-	do {
+	for (n = 0; n < SEND_OP_COND_MAX_RETRIES; n++) {
 		int ret;
-
-		if (retries == 0) {
-			ERROR("ACMD41 failed after %d retries\n",
-			      SEND_OP_COND_MAX_RETRIES);
-			return -EIO;
-		}
 
 		/* CMD55: Application Specific Command */
 		ret = mmc_send_cmd(MMC_CMD(55), 0, MMC_RESPONSE_R(1), NULL);
@@ -344,34 +339,49 @@ static int sd_send_op_cond(void)
 			return ret;
 		}
 
-		retries--;
-	} while ((resp_data[0] & OCR_POWERUP) == 0U);
+		if ((resp_data[0] & OCR_POWERUP) != 0U) {
+			mmc_ocr_value = resp_data[0];
 
-	mmc_ocr_value = resp_data[0];
+			if ((mmc_ocr_value & OCR_HCS) != 0U) {
+				mmc_dev_info->mmc_dev_type = MMC_IS_SD_HC;
+			} else {
+				mmc_dev_info->mmc_dev_type = MMC_IS_SD;
+			}
 
-	if ((mmc_ocr_value & OCR_HCS) != 0U) {
-		mmc_dev_info->mmc_dev_type = MMC_IS_SD_HC;
-	} else {
-		mmc_dev_info->mmc_dev_type = MMC_IS_SD;
+			return 0;
+		}
+
+		mdelay(1);
 	}
+
+	ERROR("ACMD41 failed after %d retries\n", SEND_OP_COND_MAX_RETRIES);
+
+	return -EIO;
+}
+
+static int mmc_reset_to_idle(void)
+{
+	int ret;
+
+	mdelay(1);
+
+	/* CMD0: reset to IDLE */
+	ret = mmc_send_cmd(MMC_CMD(0), 0, 0, NULL);
+	if (ret != 0) {
+		return ret;
+	}
+
+	mdelay(2);
 
 	return 0;
 }
 
 static int mmc_send_op_cond(void)
 {
-	int ret;
-	int retries = SEND_OP_COND_MAX_RETRIES;
+	int ret, n;
 	unsigned int resp_data[4];
 
-	do {
-		if (retries == 0) {
-			ERROR("CMD1 failed after %d retries\n",
-			      SEND_OP_COND_MAX_RETRIES);
-			return -EIO;
-		}
-
-		/* CMD1: get OCR register (SEND_OP_COND) */
+	for (n = 0; n < SEND_OP_COND_MAX_RETRIES; n++) {
 		ret = mmc_send_cmd(MMC_CMD(1), OCR_SECTOR_MODE |
 				   OCR_VDD_MIN_2V7 | OCR_VDD_MIN_1V7,
 				   MMC_RESPONSE_R(3), &resp_data[0]);
@@ -379,12 +389,17 @@ static int mmc_send_op_cond(void)
 			return ret;
 		}
 
-		retries--;
-	} while ((resp_data[0] & OCR_POWERUP) == 0U);
+		if ((resp_data[0] & OCR_POWERUP) != 0U) {
+			mmc_ocr_value = resp_data[0];
+			return 0;
+		}
 
-	mmc_ocr_value = resp_data[0];
+		mdelay(1);
+	}
 
-	return 0;
+	ERROR("CMD1 failed after %d retries\n", SEND_OP_COND_MAX_RETRIES);
+
+	return -EIO;
 }
 
 static int mmc_enumerate(unsigned int clk, unsigned int bus_width)
@@ -394,11 +409,7 @@ static int mmc_enumerate(unsigned int clk, unsigned int bus_width)
 
 	ops->init();
 
-	/* CMD0: reset to IDLE */
-	ret = mmc_send_cmd(MMC_CMD(0), 0, 0, NULL);
-	if (ret != 0) {
-		return ret;
-	}
+	mmc_reset_to_idle();
 
 	if (mmc_dev_info->mmc_dev_type == MMC_IS_EMMC) {
 		ret = mmc_send_op_cond();
