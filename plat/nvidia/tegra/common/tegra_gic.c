@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <arch_helpers.h>
 #include <assert.h>
-#include <bl_common.h>
-#include <debug.h>
-#include <interrupt_mgmt.h>
-#include <platform.h>
 #include <stdint.h>
+
+#include <arch_helpers.h>
+#include <bl31/interrupt_mgmt.h>
+#include <common/bl_common.h>
+#include <common/debug.h>
+#include <plat/common/platform.h>
+
 #include <tegra_def.h>
 #include <tegra_private.h>
 
