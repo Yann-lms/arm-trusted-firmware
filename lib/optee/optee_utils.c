@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2021, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -125,6 +125,38 @@ static int parse_optee_image(image_info_t *image_info,
 	/* Update image base and size of image_info */
 	image_info->image_base = init_load_addr;
 	image_info->image_size = init_size;
+
+	return 0;
+}
+
+/*******************************************************************************
+ * Parse the OPTEE header for an executable entry point address.
+ * Return 1 on success, 0 on failure.
+ ******************************************************************************/
+int get_optee_header_ep(entry_point_info_t *header_ep, uintptr_t *pc)
+{
+	optee_header_t *optee_header;
+	uint32_t num;
+
+	assert(pc != NULL);
+	assert(header_ep != NULL);
+	assert(header_ep->pc != 0U);
+	optee_header = (optee_header_t *)header_ep->pc;
+
+	if (!tee_validate_header(optee_header))
+		return 0;
+
+	for (num = 0U; num < optee_header->nb_images; num++) {
+		optee_image_t *optee_image =
+			&optee_header->optee_image_list[num];
+
+		if (optee_image->image_id != OPTEE_PAGER_IMAGE_ID)
+			continue;
+
+		*pc = ((uint64_t)optee_image->load_addr_hi << 32) |
+			optee_image->load_addr_lo;
+		return 1;
+	}
 
 	return 0;
 }

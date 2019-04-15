@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2021, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,6 +9,7 @@
 
 #include <common/bl_common.h>
 
+int get_optee_header_ep(entry_point_info_t *header_ep, uintptr_t *pc);
 int parse_optee_header(entry_point_info_t *header_ep,
 	image_info_t *pager_image_info,
 	image_info_t *paged_image_info);
