@@ -5,6 +5,7 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <string.h>
 
 #include <platform_def.h>
@@ -24,6 +25,8 @@
 #include <drivers/st/stm32mp1_clk.h>
 #include <drivers/st/stm32mp1_pwr.h>
 #include <drivers/st/stm32mp1_ram.h>
+#include <lib/fconf/fconf.h>
+#include <lib/fconf/fconf_dyn_cfg_getter.h>
 #include <lib/mmio.h>
 #include <lib/optee_utils.h>
 #include <lib/xlat_tables/xlat_tables_v2.h>
@@ -323,7 +326,7 @@ skip_console_init:
 	stm32mp_io_setup();
 }
 
-#if defined(AARCH32_SP_OPTEE)
+#if defined(AARCH32_SP_OPTEE) && STM32MP_USE_STM32IMAGE
 static void set_mem_params_info(entry_point_info_t *ep_info,
 				image_info_t *unpaged, image_info_t *paged)
 {
@@ -361,21 +364,90 @@ int bl2_plat_handle_post_image_load(unsigned int image_id)
 	bl_mem_params_node_t *bl32_mem_params;
 	bl_mem_params_node_t *pager_mem_params __unused;
 	bl_mem_params_node_t *paged_mem_params __unused;
+#if !STM32MP_USE_STM32IMAGE
+	const struct dyn_cfg_dtb_info_t *config_info;
+	bl_mem_params_node_t *tos_fw_mem_params;
+	unsigned int i;
+	unsigned long long ddr_top __unused;
+	const unsigned int image_ids[] = {
+		BL32_IMAGE_ID,
+		BL33_IMAGE_ID,
+		HW_CONFIG_ID,
+		TOS_FW_CONFIG_ID,
+	};
+#endif
 
 	assert(bl_mem_params != NULL);
 
 	switch (image_id) {
+#if !STM32MP_USE_STM32IMAGE
+	case FW_CONFIG_ID:
+		/* Set global DTB info for fixed fw_config information */
+		set_config_info(STM32MP_FW_CONFIG_BASE, STM32MP_FW_CONFIG_MAX_SIZE, FW_CONFIG_ID);
+		fconf_populate("FW_CONFIG", STM32MP_FW_CONFIG_BASE);
+
+		/* Iterate through all the fw config IDs */
+		for (i = 0; i < ARRAY_SIZE(image_ids); i++) {
+			bl_mem_params = get_bl_mem_params_node(image_ids[i]);
+			assert(bl_mem_params != NULL);
+
+			config_info = FCONF_GET_PROPERTY(dyn_cfg, dtb, image_ids[i]);
+			if (config_info == NULL) {
+				continue;
+			}
+
+			bl_mem_params->image_info.image_base = config_info->config_addr;
+			bl_mem_params->image_info.image_max_size = config_info->config_max_size;
+
+			bl_mem_params->image_info.h.attr &= ~IMAGE_ATTRIB_SKIP_LOADING;
+
+			switch (image_ids[i]) {
+			case BL32_IMAGE_ID:
+				bl_mem_params->ep_info.pc = config_info->config_addr;
+
+				/* In case of OPTEE, initialize address space with tos_fw addr */
+				pager_mem_params = get_bl_mem_params_node(BL32_EXTRA1_IMAGE_ID);
+				pager_mem_params->image_info.image_base = config_info->config_addr;
+				pager_mem_params->image_info.image_max_size =
+					config_info->config_max_size;
+
+				/* Init base and size for pager if exist */
+				paged_mem_params = get_bl_mem_params_node(BL32_EXTRA2_IMAGE_ID);
+				paged_mem_params->image_info.image_base = STM32MP_DDR_BASE +
+					(dt_get_ddr_size() - STM32MP_DDR_S_SIZE);
+				paged_mem_params->image_info.image_max_size = STM32MP_DDR_S_SIZE;
+				break;
+
+			case BL33_IMAGE_ID:
+				bl_mem_params->ep_info.pc = config_info->config_addr;
+				break;
+
+			case HW_CONFIG_ID:
+			case TOS_FW_CONFIG_ID:
+				break;
+
+			default:
+				return -EINVAL;
+			}
+		}
+
+		break;
+#endif /* !STM32MP_USE_STM32IMAGE */
+
 	case BL32_IMAGE_ID:
-#if defined(AARCH32_SP_OPTEE)
+#if defined(AARCH32_SP_OPTEE) || !STM32MP_USE_STM32IMAGE
 		bl_mem_params->ep_info.pc = bl_mem_params->image_info.image_base;
 		if (get_optee_header_ep(&bl_mem_params->ep_info, &bl_mem_params->ep_info.pc) == 1) {
 			/* BL32 is OP-TEE header */
+
 			pager_mem_params = get_bl_mem_params_node(BL32_EXTRA1_IMAGE_ID);
 			paged_mem_params = get_bl_mem_params_node(BL32_EXTRA2_IMAGE_ID);
 			assert((pager_mem_params != NULL) && (paged_mem_params != NULL));
 
+#if STM32MP_USE_STM32IMAGE
 			set_mem_params_info(&bl_mem_params->ep_info, &pager_mem_params->image_info,
 					    &paged_mem_params->image_info);
+#endif
 
 			err = parse_optee_header(&bl_mem_params->ep_info,
 						 &pager_mem_params->image_info,
@@ -392,6 +464,10 @@ int bl2_plat_handle_post_image_load(unsigned int image_id)
 		} else {
 #if STM32MP_USE_STM32IMAGE
 			bl_mem_params->ep_info.pc = STM32MP_BL32_BASE;
+#else
+			tos_fw_mem_params = get_bl_mem_params_node(TOS_FW_CONFIG_ID);
+			bl_mem_params->image_info.image_max_size +=
+				tos_fw_mem_params->image_info.image_max_size;
 #endif
 			bl_mem_params->ep_info.args.arg0 = 0;
 		}
@@ -402,6 +478,7 @@ int bl2_plat_handle_post_image_load(unsigned int image_id)
 		bl32_mem_params = get_bl_mem_params_node(BL32_IMAGE_ID);
 		assert(bl32_mem_params != NULL);
 		bl32_mem_params->ep_info.lr_svc = bl_mem_params->ep_info.pc;
+
 		break;
 
 	default:
