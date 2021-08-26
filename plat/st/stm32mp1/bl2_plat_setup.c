@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2021, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -338,6 +338,7 @@ void bl2_el3_plat_arch_setup(void)
 		tamp_bkpr(BOOT_API_CORE1_MAGIC_NUMBER_TAMP_BCK_REG_IDX);
 	uint32_t bkpr_core1_addr =
 		tamp_bkpr(BOOT_API_CORE1_BRANCH_ADDRESS_TAMP_BCK_REG_IDX);
+	uint32_t rstsr;
 
 	mmap_add_region(BL_CODE_BASE, BL_CODE_BASE,
 			BL_CODE_END - BL_CODE_BASE,
@@ -421,10 +422,12 @@ void bl2_el3_plat_arch_setup(void)
 		      TAMP_BKP_SEC_NUMBER << TAMP_BKP_SEC_WDPROT_SHIFT |
 		      TAMP_BKP_SEC_NUMBER << TAMP_BKP_SEC_RWDPROT_SHIFT);
 
-	if ((boot_context->boot_action !=
-	     BOOT_API_CTX_BOOT_ACTION_WAKEUP_CSTANDBY) &&
-	    (boot_context->boot_action !=
-	     BOOT_API_CTX_BOOT_ACTION_WAKEUP_STANDBY)) {
+	rstsr = mmio_read_32(stm32mp_rcc_base() + RCC_MP_RSTSCLRR);
+	if (((boot_context->boot_action !=
+	      BOOT_API_CTX_BOOT_ACTION_WAKEUP_CSTANDBY) &&
+	     (boot_context->boot_action !=
+	      BOOT_API_CTX_BOOT_ACTION_WAKEUP_STANDBY)) ||
+	    ((rstsr & RCC_MP_RSTSCLRR_PADRSTF) != 0U)) {
 		mmio_write_32(bkpr_core1_addr, 0);
 		mmio_write_32(bkpr_core1_magic, 0);
 	}
