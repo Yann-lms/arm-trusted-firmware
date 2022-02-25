@@ -182,6 +182,11 @@ FIP_DEPS += enctool
 FWU_FIP_DEPS += enctool
 endif
 
+ifeq (${PSA_FWU_SUPPORT},1)
+FWUMD_ARGS += --nb-fw-imgs ${NR_OF_FW_BANKS}
+FWUMD_ARGS += --nb-banks ${NR_OF_IMAGES_IN_FW_BANK}
+endif
+
 ################################################################################
 # Toolchain
 ################################################################################
@@ -1062,6 +1067,10 @@ ENCTOOL			?=	${ENCTOOLPATH}/encrypt_fw${BIN_EXT}
 # Variables for use with Firmware Image Package
 FIPTOOLPATH		?=	tools/fiptool
 FIPTOOL			?=	${FIPTOOLPATH}/fiptool${BIN_EXT}
+
+# Variables for use with Firmware Update Metadata
+FWUMDTOOLPATH		?=	tools/fwu_gen_metadata/
+FWUMDTOOL		?=	${FWUMDTOOLPATH}/fwumd_tool.py
 
 # Variables for use with sptool
 SPTOOLPATH		?=	tools/sptool
