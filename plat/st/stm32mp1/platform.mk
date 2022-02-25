@@ -96,6 +96,10 @@ ifeq (${PSA_FWU_SUPPORT},1)
 # Number of banks of updatable firmware
 NR_OF_FW_BANKS			:=	2
 NR_OF_IMAGES_IN_FW_BANK		:=	1
+JSON_METADATA			?=	plat/st/stm32mp1/default_metadata.json
+STM32_DEPS			+=	${BUILD_PLAT}/metadata.bin
+
+$(eval $(call GEN_METADATA,${JSON_METADATA},${BUILD_PLAT}/metadata.bin))
 
 FWU_MAX_PART = $(shell echo $$(($(STM32_TF_A_COPIES) + 2 + $(NR_OF_FW_BANKS))))
 ifeq ($(shell test $(FWU_MAX_PART) -gt $(PLAT_PARTITION_MAX_ENTRIES); echo $$?),0)
