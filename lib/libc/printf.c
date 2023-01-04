@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -129,6 +129,10 @@ loop:
 
 				count += unsigned_num_print(unum, 10,
 							    padc, padn);
+				break;
+			case 'c':
+				(void)putchar(va_arg(args, int));
+				count++;
 				break;
 			case 's':
 				str = va_arg(args, char *);

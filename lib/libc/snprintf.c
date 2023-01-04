@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2017-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -180,6 +180,9 @@ loop:
 
 				unsigned_num_print(&s, n, &chars_printed,
 						   unum, 10, padc, padn, false);
+				break;
+			case 'c':
+				CHECK_AND_PUT_CHAR(s, n, chars_printed, va_arg(args, int));
 				break;
 			case 's':
 				str = va_arg(args, char *);
