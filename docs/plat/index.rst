@@ -39,7 +39,7 @@ Platform Ports
    rockchip
    socionext-uniphier
    synquacer
-   stm32mp1
+   st/index
    ti-k3
    xilinx-versal-net
    xilinx-versal
@@ -79,4 +79,4 @@ Deprecated platforms
 
 --------------
 
-*Copyright (c) 2019-2022, Arm Limited. All rights reserved.*
+*Copyright (c) 2019-2023, Arm Limited. All rights reserved.*
