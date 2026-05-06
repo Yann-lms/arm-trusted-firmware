@@ -1144,7 +1144,11 @@ void gicv3_raise_sgi(unsigned int sgi_num, gicv3_irq_group_t group,
 	uint64_t sgi_val;
 
 	/* Verify interrupt number is in the SGI range */
+#if (MIN_SGI_ID > 0)
 	assert((sgi_num >= MIN_SGI_ID) && (sgi_num < MIN_PPI_ID));
+#else
+	assert(sgi_num < MIN_PPI_ID);
+#endif
 
 	/* Extract affinity fields from target */
 	aff0 = (unsigned int)MPIDR_AFFLVL0_VAL(target);
