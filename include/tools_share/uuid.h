@@ -58,6 +58,16 @@ struct uuid {
 	uint8_t		node[_UUID_NODE_LEN];
 };
 
+#define NULL_UUID					\
+	{						\
+		.time_low = { 0U },			\
+		.time_mid = { 0U },			\
+		.time_hi_and_version = { 0U },		\
+		.clock_seq_hi_and_reserved = 0U,	\
+		.clock_seq_low = 0U,			\
+		.node = { 0U }				\
+	}
+
 struct efi_guid {
 	uint32_t time_low;
 	uint16_t time_mid;
